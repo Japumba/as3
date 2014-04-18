@@ -31,6 +31,7 @@ package utils.Console
 		public static var _sprite:Sprite;//sprite containing the bg, buttons and textfields. This is added to the stage.
 		
 		public static var _dispatcher:EventDispatcher;//event dispatcher.
+		public static var _consoleBinder:IConsoleBinder;//console Binder.
 		
 		public static var _saveToFilePermission:Boolean = true;
 		public static var _logFilePath:String = "ConsoleLog.txt";
@@ -178,6 +179,16 @@ package utils.Console
 			
 			_stage.addEventListener(KeyboardEvent.KEY_DOWN, manageKey);
 			_inputTextField.addEventListener(Event.CHANGE, textInput, false, 1);
+			
+			_consoleBinder = new EchoBinder();
+			_dispatcher.addEventListener(ConsoleEvent.COMMAND_SUBMITTED, _consoleBinder.parseCommand);
+		}
+		
+		public static function bind(binder:IConsoleBinder):void
+		{
+			_dispatcher.removeEventListener(ConsoleEvent.COMMAND_SUBMITTED, _consoleBinder.parseCommand);
+			_consoleBinder = binder;
+			_dispatcher.addEventListener(ConsoleEvent.COMMAND_SUBMITTED, _consoleBinder.parseCommand);
 		}
 		
 		public static function manageKey(e:KeyboardEvent):void
