@@ -1,6 +1,7 @@
 package utils.Console  
 {
 	import adobe.utils.CustomActions;
+	import flash.desktop.ClipboardFormats;
 	import flash.display.InteractiveObject;
 	import flash.events.FocusEvent;
 	import flash.events.TextEvent;
@@ -21,6 +22,10 @@ package utils.Console
 	import flash.text.TextFormatAlign;
 	import flash.text.TextFieldType;
 	import flash.net.FileReference;
+	import flash.errors.IOError;
+	import flash.events.IOErrorEvent;
+	import flash.net.URLLoader;
+	import flash.net.URLRequest;
 	
 	/**
 	 * ...
@@ -31,7 +36,7 @@ package utils.Console
 		public static var _sprite:Sprite;//sprite containing the bg, buttons and textfields. This is added to the stage.
 		
 		public static var _dispatcher:EventDispatcher;//event dispatcher.
-		public static var _consoleBinder:IConsoleBinder;//console Binder.
+		public static var _bindedMethods:Object;//console Binder.
 		
 		public static var _saveToFilePermission:Boolean = true;
 		public static var _logFilePath:String = "ConsoleLog.txt";
@@ -180,15 +185,79 @@ package utils.Console
 			_stage.addEventListener(KeyboardEvent.KEY_DOWN, manageKey);
 			_inputTextField.addEventListener(Event.CHANGE, textInput, false, 1);
 			
-			_consoleBinder = new EchoBinder();
-			_dispatcher.addEventListener(ConsoleEvent.COMMAND_SUBMITTED, _consoleBinder.parseCommand);
+			_bindedMethods = new Object();
+			_dispatcher.addEventListener(ConsoleEvent.COMMAND_SUBMITTED, execCommand);
+			
+			//bind Console commands:
+			bindFunction("Console.runBatch", runBatch);
+			bindFunction("Console.saveLog", saveLogToFile);
+			bindFunction("Console.clear", clearConsole);
 		}
 		
-		public static function bind(binder:IConsoleBinder):void
+		private static function clearConsole(args:Array):void
+        {
+			Console.setTopLine(Console._lines.length - 1);
+        }
+		
+		private static function runBatch(args:Array):void
 		{
-			_dispatcher.removeEventListener(ConsoleEvent.COMMAND_SUBMITTED, _consoleBinder.parseCommand);
-			_consoleBinder = binder;
-			_dispatcher.addEventListener(ConsoleEvent.COMMAND_SUBMITTED, _consoleBinder.parseCommand);
+			if (args.length < 2)
+			{
+				Console.writeLine("Usage: runBatch <fileName>");
+				return;
+			}
+			
+			var path:String = args[1];
+
+			var myTextLoader:URLLoader = new URLLoader();
+			myTextLoader.addEventListener(flash.events.Event.COMPLETE, onLoaded);
+			myTextLoader.addEventListener(IOErrorEvent.IO_ERROR, loaderIOErrorHandler);
+			myTextLoader.load(new URLRequest(path));
+		}
+		
+		private static function onLoaded(e:flash.events.Event):void {
+			var arr:Array = e.target.data.split("\r\n");
+			for (var i:int = 0; i < arr.length; i++) 
+			{
+				Console.submitCommand(arr[i]);
+			}
+		}
+		
+		private static function loaderIOErrorHandler(e:IOErrorEvent):void 
+		{
+			Console.writeLine("Couldn't run batch. Exception: " + e.text);
+		}
+		
+		public static function execCommand(e:ConsoleEvent):void
+		{
+			var code:String = e.data;
+			var components:Array = code.split(" ");
+			
+			var key:String = components[0];
+			
+			if (_bindedMethods[key] == null)
+			{
+				writeLine("Invalid command");
+				return;
+			}
+			try 
+			{
+				_bindedMethods[key](components);
+			}
+			catch (err:Error)
+			{
+				writeLine(err.name);
+			}
+		}
+		
+		public static function bindFunction(key:String, method:Function):void
+		{
+			if (_bindedMethods[key] != null)
+			{
+				writeLine("Failed to bind Function: key in use");
+			}
+			if (key != null && method != null)
+				_bindedMethods[key] = method;
 		}
 		
 		public static function manageKey(e:KeyboardEvent):void
@@ -219,7 +288,7 @@ package utils.Console
 			}
 		}
 		
-		public static function saveLogToFile():void {
+		public static function saveLogToFile(args:Array = null):void {
 			if(_saveToFilePermission)
 			{
 				writeLine("Saving console log to file");
