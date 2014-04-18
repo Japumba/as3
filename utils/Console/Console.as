@@ -32,7 +32,7 @@ package utils.Console
 		
 		public static var _dispatcher:EventDispatcher;//event dispatcher.
 		
-		public static var _saveToFilePermission:Boolean = false;
+		public static var _saveToFilePermission:Boolean = true;
 		public static var _logFilePath:String = "ConsoleLog.txt";
 		
 		public static var _lines:Vector.<String>;//contains every line wrote to the console.
@@ -259,7 +259,7 @@ package utils.Console
 				return;
 				
 			_lastLine = command;
-			writeLine(_lastLine);
+			writeLine("> " + command);
 			var newEvent:ConsoleEvent = new ConsoleEvent(ConsoleEvent.COMMAND_SUBMITTED);
 			newEvent.data = command;
 			_dispatcher.dispatchEvent(newEvent);
