@@ -42,6 +42,8 @@ package utils.Console
 		public static var _logFilePath:String = "ConsoleLog.txt";
 		
 		public static var _lines:Vector.<String>;//contains every line wrote to the console.
+		public static var _inputHistory:Vector.<String>//contains every line introduced by the user.
+		public static var _curInputHistoryBrowse:int;//index of the current history line being explored
 		public static var _textFieldLines:Vector.<TextField>;//contains each textfield to display the lines.
 		public static var _numLinesToDisplay:int;//number of lines to display in the console.
 		public static var _topLine:int;//index of the top line to display in the console ( this is: _lines[_topLine] ).
@@ -87,6 +89,7 @@ package utils.Console
 			
 			_sprite = new Sprite();
 			_lines = new Vector.<String>();
+			_inputHistory = new Vector.<String>();
 			_textFieldLines = new Vector.<TextField>();
 			_dispatcher = new EventDispatcher();
 			
@@ -276,16 +279,58 @@ package utils.Console
 				
 			if (e.keyCode == Keyboard.ENTER || e.keyCode == Keyboard.NUMPAD_ENTER)
 			{
-				submitCommand(_inputTextField.text);
+				submitInputCommand(_inputTextField.text);
 				clearInput();
 			}
-			if (e.ctrlKey)
-			{
-				if (e.keyCode == Keyboard.UP)
+
+			if (e.keyCode == Keyboard.UP)
+				if(e.ctrlKey)
 					scrollUp();
-				if (e.keyCode == Keyboard.DOWN)
+				else
+					browseHistoryUp();
+			if (e.keyCode == Keyboard.DOWN)
+				if(e.ctrlKey)
 					scrollDown();
-			}
+				else
+					browseHistoryDown();
+		}
+		
+		public static function submitInputCommand(s:String)
+		{
+			_inputHistory.push(s);
+			_curInputHistoryBrowse = _inputHistory.length;
+			submitCommand(s);
+		}
+		
+		public static function browseHistoryUp():void 
+		{
+			if (_inputHistory.length == 0)
+				return;
+				
+			_curInputHistoryBrowse = Math.max(0, _curInputHistoryBrowse-1);
+			setInputText(_inputHistory[_curInputHistoryBrowse]);
+		}
+		
+		public static function setInputText(s:String)
+		{
+			if (s == null)
+				return;
+				
+			_inputTextField.text = s;
+		}
+		
+		public static function browseHistoryDown():void 
+		{
+			if (_inputHistory.length == 0)
+				return;
+				
+			_curInputHistoryBrowse = Math.min(_inputHistory.length, _curInputHistoryBrowse+1);
+			var newS:String;
+			if (_curInputHistoryBrowse == _inputHistory.length)
+				newS = "";
+			else
+				newS = _inputHistory[_curInputHistoryBrowse];
+			setInputText(newS);
 		}
 		
 		public static function saveLogToFile(args:Array = null):void {
@@ -366,7 +411,7 @@ package utils.Console
 		}
 		
 		public static function writeLine(line:String):void
-		{
+		{			
 			_lines.push(line);
 			if((_autoScroll) && (_topLine + _numLinesToDisplay <= _lines.length))
 				setTopLine(_lines.length - _numLinesToDisplay);
