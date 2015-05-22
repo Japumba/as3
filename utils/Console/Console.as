@@ -1,5 +1,4 @@
-package utils.Console  
-{
+package utils.Console {
 	import adobe.utils.CustomActions;
 	import flash.desktop.ClipboardFormats;
 	import flash.display.InteractiveObject;
@@ -75,14 +74,16 @@ package utils.Console
 		
 		public static var _visible:Boolean;//indicates whether the console is being shown or not
 		public static var _toggleKey:uint = 220;//key binded for toggling visibility
+		public static var _altToggleKey:uint = 0;//17 //alternate key binded for toggling visibility
 		public static var _hideKey:uint = Keyboard.ESCAPE;//key binded for hiding the console.
+		public static var _locked:Boolean = false;
 		
 		public function Console() 
 		{
 			super();
 		}
 		
-		public static function init(s:Stage):void
+		public static function init(s:Stage, options:Object = null):void
 		{
 			_stage = s;
 			_visible = false;
@@ -98,7 +99,7 @@ package utils.Console
 			
 			_foreColor = 0xC0C0C0;
 			
-			_lineFormatSize = 12;
+			_lineFormatSize = options != null ? (options["lineFormatSize"] != undefined ? options["lineFormatSize"]:12):12;
 			_lineFormat = new TextFormat();
 			_lineFormat.font = "Consolas";
 			_lineFormat.size = _lineFormatSize;
@@ -185,7 +186,8 @@ package utils.Console
 			
 			_sprite.y = _stage.stageHeight - _sprite.height;
 			
-			_stage.addEventListener(KeyboardEvent.KEY_DOWN, manageKey);
+			_stage.addEventListener(KeyboardEvent.KEY_DOWN, manageKey, false, 10);
+			_stage.addEventListener(KeyboardEvent.KEY_UP, catchKeyUp, false, 10);
 			_inputTextField.addEventListener(Event.CHANGE, textInput, false, 1);
 			
 			_bindedMethods = new Object();
@@ -195,6 +197,21 @@ package utils.Console
 			bindFunction("Console.runBatch", runBatch);
 			bindFunction("Console.saveLog", saveLogToFile);
 			bindFunction("Console.clear", clearConsole);
+			bindFunction("Console.help", help);
+		}
+		
+		private static function catchKeyUp(e:KeyboardEvent):void 
+		{
+			if (_visible)
+				e.stopImmediatePropagation();
+		}
+		
+		private static function help(args:Array):void 
+		{
+			for (var f:String in _bindedMethods) 
+			{
+				Console.writeLine(f);
+			}
 		}
 		
 		private static function clearConsole(args:Array):void
@@ -236,7 +253,7 @@ package utils.Console
 			var code:String = e.data;
 			var components:Array = code.split(" ");
 			
-			var key:String = components[0];
+			var key:String = (components[0] as String).toLowerCase();
 			
 			if (_bindedMethods[key] == null)
 			{
@@ -255,9 +272,11 @@ package utils.Console
 		
 		public static function bindFunction(key:String, method:Function):void
 		{
+			key = key.toLowerCase();
 			if (_bindedMethods[key] != null)
 			{
-				writeLine("Failed to bind Function: key in use");
+				writeLine("Failed to bind Function with key[ " + key + " ]: key already in use");
+				return;
 			}
 			if (key != null && method != null)
 				_bindedMethods[key] = method;
@@ -265,7 +284,10 @@ package utils.Console
 		
 		public static function manageKey(e:KeyboardEvent):void
 		{
-			if (e.keyCode == _toggleKey)
+			if (_visible)
+				e.stopImmediatePropagation();
+			
+			if (e.keyCode == _toggleKey || e.keyCode == _altToggleKey)
 			{
 				Console.toggleConsole();
 			}
@@ -295,7 +317,7 @@ package utils.Console
 					browseHistoryDown();
 		}
 		
-		public static function submitInputCommand(s:String)
+		public static function submitInputCommand(s:String):void
 		{
 			_inputHistory.push(s);
 			_curInputHistoryBrowse = _inputHistory.length;
@@ -311,7 +333,7 @@ package utils.Console
 			setInputText(_inputHistory[_curInputHistoryBrowse]);
 		}
 		
-		public static function setInputText(s:String)
+		public static function setInputText(s:String):void
 		{
 			if (s == null)
 				return;
@@ -420,9 +442,9 @@ package utils.Console
 		
 		public static function showConsole():void
 		{
-			if (_visible)
+			if (_visible || _locked)
 				return;
-				
+			
 			_visible = true;
 			_prevFocus = _stage.focus;
 			_stage.focus = _inputTextField;
@@ -438,9 +460,9 @@ package utils.Console
 		
 		public static function hideConsole(forceHide:Boolean = false):void
 		{
-			if (!_visible || (_stage.focus == _inputTextField && !forceHide))
+			if (!_visible || (_stage.focus == _inputTextField && !forceHide || _locked))
 				return;
-				
+			
 			_visible = false;
 			_stage.focus = _prevFocus;
 			_stage.removeChild(_sprite);

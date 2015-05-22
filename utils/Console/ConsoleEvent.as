@@ -1,5 +1,4 @@
-package utils.Console 
-{
+package utils.Console {
 	import flash.events.Event;
 	
 	/**
